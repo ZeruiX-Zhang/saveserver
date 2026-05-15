@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="apple-blue">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0">
+  <meta name="theme-color" content="#f5f5f7">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <title>库存管理</title>
+  <link rel="manifest" href="./manifest.webmanifest?v=20260506-pwa-01">
+  <link rel="icon" href="./assets/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="./assets/icon.svg">
+  <link rel="stylesheet" href="./styles.css?v=20260430-export-01">
+</head>
+<body>
+  <div id="app" class="app-shell"></div>
+
+  <dialog id="app-dialog" class="app-dialog"></dialog>
+  <input id="hidden-file-input" class="visually-hidden" type="file">
+
+  <script src="./vendor/xlsx.full.min.js?v=20260430-export-01"></script>
+  <script type="module" src="./src/app.js?v=20260430-export-01"></script>
+</body>
+</html>

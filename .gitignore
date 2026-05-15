@@ -1,0 +1,22 @@
+node_modules/
+dist-desktop/
+
+# Local data — each install gets its own SQLite store and sync token.
+data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Excel bridge scratch
+tmp_excel_test/
+scripts/__pycache__/
+
+# Editor / OS junk
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Local Claude Code settings (per-developer, not shared)
+.claude/settings.local.json

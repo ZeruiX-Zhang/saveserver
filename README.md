@@ -1,0 +1,107 @@
+# 仓位管理系统
+
+本地可运行的 `响应式网页 + PWA`，包含：
+
+- `电脑端`：产品管理、仓位配置、库存可视化、操作包导入、主数据导出
+- `手持端 (规划中: 安卓 App)`：现场拍照/扫码采集、相似图查询、上传新产品
+- `本地数据库`：`SQLite`，由 `server.js` 通过 `better-sqlite3` 直接读写
+- `运行方式`：本地静态服务 + HTTP API，支持局域网内多台 PC 共享同一份数据
+
+## 目录
+
+- [app/index.html](app/index.html)
+- [app/src/app.js](app/src/app.js)
+- [app/src/storage.js](app/src/storage.js) — 前端通过 fetch 访问 server.js
+- [server.js](server.js) — HTTP 服务器（静态资源 + KV API + 同步 API）
+- [database/db.js](database/db.js) — SQLite 后端
+- [sync.js](sync.js) — 安卓 ↔ PC 同步逻辑（局域网 + USB 包）
+
+## 在一台新电脑上首次部署
+
+前置条件：装 [Node.js](https://nodejs.org/) 18 或更新版本（自带 `npm`）。Python 仅当你需要用 Excel 导入导出时才装。
+
+```bash
+# 1. 把项目目录拷过来（或 git clone）
+cd <项目根目录>
+
+# 2. 安装依赖（首次会下载 better-sqlite3 的预编译版本）
+npm install
+
+# 3. 启动
+npm start
+# 等价于: node server.js
+```
+
+启动成功会看到：
+
+```
+Warehouse PWA server running at http://0.0.0.0:4173
+```
+
+打开浏览器访问 `http://localhost:4173/`。首次访问会自动写入演示数据。
+
+如不想用命令行，也可以直接双击 [start-app.cmd](start-app.cmd)（Windows）。
+
+### 数据存哪里
+
+- SQLite 数据库：`data/warehouse.db`（首次启动时自动创建）
+- 同步 token：`data/sync-token.txt`（首次启动时自动生成）
+- 这两个文件**不会**被 `.gitignore` 提交。如果想把数据从一台电脑迁到另一台，整个 `data/` 目录拷过去即可。
+
+## 局域网内多台 PC 共用同一份数据
+
+`server.js` 默认监听 `0.0.0.0:4173`，意味着同一个局域网（比如同一个 Wi-Fi 或办公室路由器）下的其他电脑可以直接通过浏览器访问。
+
+**步骤**：
+
+1. 在其中一台电脑上正常启动（`npm start`）。这台是 **中心电脑**。
+2. 在中心电脑上查它的局域网 IPv4 地址：
+   - Windows: `ipconfig` 找"无线局域网适配器 WLAN"或"以太网适配器"下的 `IPv4 地址`
+   - macOS / Linux: `ifconfig` 或 `ip addr`
+   - 例如 `192.168.1.10`
+3. 其他电脑的浏览器打开 `http://192.168.1.10:4173/`，即可使用同一份数据。
+4. **首次需要放行 Windows 防火墙**：第一次启动 `node server.js` 时 Windows 会弹窗询问是否允许 Node.js 通过防火墙，勾选"专用网络"并允许。如果当时没弹，去`控制面板 → Windows Defender 防火墙 → 允许应用通过防火墙` 里手动加 `node.exe` 的入站规则。
+
+**所有 PC 都能改数据**：因为只有中心电脑这一份 SQLite，写入是顺序的，没有并发冲突。两个人同时编辑同一条记录的话，后保存的覆盖先保存的——这跟绝大多数协作工具一致。
+
+**中心电脑必须开机且 server 在跑**，否则其他 PC 访问不到。如果想让中心电脑后台默默跑 server，用 `start-app.vbs`（隐藏窗口启动）。
+
+## 端口和环境变量
+
+| 变量 | 用途 | 默认 |
+| --- | --- | --- |
+| `PORT` | server 监听端口 | `4173` |
+| `HOST` | server 监听地址 | `0.0.0.0`（所有网卡）。改成 `127.0.0.1` 可禁止外部访问 |
+| `WAREHOUSE_DB_PATH` | SQLite 文件路径 | `<项目>/data/warehouse.db` |
+| `WAREHOUSE_TOKEN_PATH` | 同步 token 文件路径 | `<项目>/data/sync-token.txt` |
+| `WAREHOUSE_APP_PYTHON` | Python 解释器（仅 Excel 桥需要） | 自动找 `python` / `py` |
+| `WAREHOUSE_APP_NODE` | 显式指定 node.exe 路径（仅 .cmd / .vbs 启动器） | 自动找 `node` |
+
+例如限定本机访问、改用 8080 端口：
+
+```bash
+HOST=127.0.0.1 PORT=8080 npm start
+```
+
+## 安卓 App 同步（开发中）
+
+桌面端已经准备好同步 API：
+
+- `GET /api/sync/master-data` 主数据下行
+- `POST /api/sync/upload` 产品上行
+- `GET /api/sync/export-package` 导出 USB 主数据包（gzip JSON）
+- `POST /api/sync/import-package` 导入 USB 上传包
+
+所有 `/api/sync/*` 端点要求 `X-Sync-Token` 或 `Authorization: Bearer <token>`。token 在 `data/sync-token.txt`。
+
+安卓端用 Capacitor 包装，开发完成后会有单独安装指南。
+
+## 桌面应用打包（可选）
+
+```bash
+npm run setup:desktop   # 安装 electron + electron-builder（仅首次）
+npm run electron        # 开发模式预览 Electron 壳
+npm run build:desktop   # 生成 .exe 安装包到 dist-desktop/
+```
+
+打出来的 .exe 可以分发给没装 Node 的同事，双击安装即可使用。

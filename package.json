@@ -1,0 +1,50 @@
+{
+  "name": "warehouse-pwa-desktop",
+  "version": "0.1.0",
+  "description": "离线仓位管理系统 - 本地 PWA + 桌面壳",
+  "private": true,
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "node server.js",
+    "electron": "electron .",
+    "build:desktop": "electron-builder --win --x64",
+    "setup:desktop": "npm install --save-dev electron electron-builder"
+  },
+  "build": {
+    "appId": "com.local.warehouse-pwa",
+    "productName": "仓位管理系统",
+    "asar": true,
+    "directories": {
+      "output": "dist-desktop",
+      "buildResources": "app/assets"
+    },
+    "files": [
+      "electron/**/*",
+      "server.js",
+      "scripts/**/*",
+      "app/**/*"
+    ],
+    "win": {
+      "icon": "app/assets/icon.ico",
+      "target": [
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "仓位管理系统"
+    }
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.3.1",
+    "@capacitor/core": "^8.3.1",
+    "@capacitor/preferences": "^8.0.1",
+    "better-sqlite3": "^12.9.0",
+    "sharp": "^0.34.5"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.3.1"
+  }
+}
