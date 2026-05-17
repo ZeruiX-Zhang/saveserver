@@ -76,6 +76,8 @@ const state = {
   toasts: [],
   scanner: null,
   syncTokenVisible: false,
+  pairingPanelExpanded: false,
+  pairingSelectedAddress: null,
 };
 
 let toastSeq = 0;
@@ -3656,7 +3658,7 @@ async function renderSyncInfoDialog() {
     return `
       <li class="sync-url-row">
         <code class="sync-url">${escapeHtml(url)}</code>
-        <span class="sync-url-iface">${escapeHtml(entry.iface)}</span>
+        <span class="sync-url-iface">${escapeHtml(entry.interface || entry.iface || "")}</span>
         <button class="button ghost" type="button" data-action="copy-text" data-text="${escapeHtml(url)}" data-success="地址已复制">复制</button>
       </li>
     `;
@@ -3710,11 +3712,16 @@ async function renderSyncInfoDialog() {
           <button class="button ghost" type="button" data-action="copy-text" data-text="${escapeHtml(info.token)}" data-success="令牌已复制" ${info.token ? "" : "disabled"}>复制</button>
         </div>
       </section>
+      ${renderPairingPanel(info)}
     `
     : `
       <section class="sync-section">
         <h4 class="sync-section-title">本机服务器信息</h4>
         <p class="sync-hint">当前未连接到本机服务器（可能正运行在远程客户端模式）。</p>
+      </section>
+      <section class="sync-section">
+        <h4 class="sync-section-title">手持端配对</h4>
+        <p class="sync-hint sync-pairing-warning">请在运行 server 的本机浏览器打开此面板。</p>
       </section>
     `;
 
@@ -3730,6 +3737,127 @@ async function renderSyncInfoDialog() {
       </div>
     </div>
   `);
+
+  // After the dialog is in the DOM, draw the QR code if the pairing panel is
+  // open. The QR rendering is deferred until expanded so the canvas isn't
+  // wasted when the user just glances at sync info.
+  if (state.pairingPanelExpanded && serverInfoOk) {
+    drawPairingQr(info);
+  }
+}
+
+/**
+ * Render the "手持端配对" collapsible panel.
+ *
+ * Rendering choice: we use the MIT-licensed `qrcodejs` library vendored at
+ * `app/vendor/qrcode.min.js`, loaded as a global `QRCode` from
+ * `app/index.html`. The QR payload is `JSON.stringify({ v: 1, apiBase,
+ * syncToken })` — matching design.md §Data Models "Pairing QR Content".
+ * The handheld scans this with its camera at first launch (R1.3); the
+ * plain-text apiBase / token below the canvas is the manual fallback (R1.3).
+ */
+function renderPairingPanel(info) {
+  const expanded = !!state.pairingPanelExpanded;
+  const addresses = info.addresses || [];
+  const selectedAddress =
+    state.pairingSelectedAddress &&
+    addresses.some((a) => a.address === state.pairingSelectedAddress)
+      ? state.pairingSelectedAddress
+      : (addresses[0]?.address || "");
+  state.pairingSelectedAddress = selectedAddress;
+
+  const port = Number(info.port) || 4173;
+  const apiBase = selectedAddress ? `http://${selectedAddress}:${port}` : "";
+  const syncToken = info.token || "";
+
+  const optionsHtml = addresses.map((entry) => {
+    const label = `${entry.address}:${port}` + (entry.interface || entry.iface ? ` (${entry.interface || entry.iface})` : "");
+    return `<option value="${escapeHtml(entry.address)}" ${entry.address === selectedAddress ? "selected" : ""}>${escapeHtml(label)}</option>`;
+  }).join("");
+
+  const headerRow = `
+    <button class="sync-pairing-toggle" type="button" data-action="toggle-pairing-panel" aria-expanded="${expanded ? "true" : "false"}">
+      <span class="sync-pairing-toggle-caret">${expanded ? "▾" : "▸"}</span>
+      <span>手持端配对</span>
+    </button>
+  `;
+
+  if (!expanded) {
+    return `
+      <section class="sync-section sync-pairing-section">
+        ${headerRow}
+      </section>
+    `;
+  }
+
+  if (!addresses.length) {
+    return `
+      <section class="sync-section sync-pairing-section sync-pairing-section-open">
+        ${headerRow}
+        <p class="sync-hint sync-pairing-warning">未检测到局域网地址，无法生成配对二维码。请连入 Wi-Fi / 有线网络后重试。</p>
+      </section>
+    `;
+  }
+
+  return `
+    <section class="sync-section sync-pairing-section sync-pairing-section-open">
+      ${headerRow}
+      <p class="sync-hint">让手持端 App 扫描下方二维码完成配对；如无法扫码，请手动输入下方的服务器地址与同步令牌。</p>
+      <div class="sync-pairing-grid">
+        <div class="sync-pairing-form">
+          <label class="sync-pairing-label">
+            <span>服务器地址</span>
+            <select data-action="select-pairing-address">
+              ${optionsHtml}
+            </select>
+          </label>
+          <div class="sync-pairing-field">
+            <span class="sync-pairing-field-label">apiBase</span>
+            <code class="sync-url">${escapeHtml(apiBase)}</code>
+          </div>
+          <div class="sync-pairing-field">
+            <span class="sync-pairing-field-label">syncToken</span>
+            <code class="sync-token">${escapeHtml(syncToken)}</code>
+            <button class="button ghost" type="button" data-action="copy-text" data-text="${escapeHtml(syncToken)}" data-success="令牌已复制" ${syncToken ? "" : "disabled"}>复制令牌</button>
+          </div>
+        </div>
+        <div class="sync-pairing-qr-wrap">
+          <div id="pairing-qr-host" class="sync-pairing-qr"></div>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+/**
+ * Draw the pairing QR code. qrcodejs renders into an HTMLElement (img/canvas
+ * depending on browser); we use the host div + a clear() between renders so
+ * switching addresses updates the QR in place.
+ */
+function drawPairingQr(info) {
+  if (typeof QRCode === "undefined") {
+    console.warn("QRCode library not loaded; pairing QR disabled");
+    return;
+  }
+  const host = document.getElementById("pairing-qr-host");
+  if (!host) return;
+  const port = Number(info.port) || 4173;
+  const address = state.pairingSelectedAddress || (info.addresses?.[0]?.address || "");
+  if (!address) return;
+  const payload = JSON.stringify({
+    v: 1,
+    apiBase: `http://${address}:${port}`,
+    syncToken: info.token || "",
+  });
+  // Re-create from scratch every render so old QR doesn't linger.
+  host.innerHTML = "";
+  // eslint-disable-next-line no-new
+  new QRCode(host, {
+    text: payload,
+    width: 180,
+    height: 180,
+    correctLevel: QRCode.CorrectLevel ? QRCode.CorrectLevel.M : 0,
+  });
 }
 
 function renderRemoteConfigDialog(prefill = null) {
@@ -5480,6 +5608,10 @@ async function handleAction(action, element) {
       state.syncTokenVisible = !state.syncTokenVisible;
       await renderSyncInfoDialog();
       return;
+    case "toggle-pairing-panel":
+      state.pairingPanelExpanded = !state.pairingPanelExpanded;
+      await renderSyncInfoDialog();
+      return;
     case "copy-text":
       await copyText(element.dataset.text || "", element.dataset.success || "已复制");
       return;
@@ -5616,6 +5748,10 @@ function handleDialogInput(event) {
   }
   if (target.matches("[data-role='move-target-shelf']")) {
     syncMoveDialogTargets(target.closest("[data-form='move-product']"), "shelf");
+  }
+  if (target.matches("[data-action='select-pairing-address']")) {
+    state.pairingSelectedAddress = target.value || null;
+    void renderSyncInfoDialog();
   }
 }
 

@@ -1716,6 +1716,113 @@ tbody tr:hover {
   word-break: break-all;
 }
 
+/* ---------------------- 19b. Handheld pairing panel ---------------------- */
+.sync-pairing-section .sync-pairing-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 4px 0;
+  background: none;
+  border: none;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.sync-pairing-section .sync-pairing-toggle:hover {
+  color: var(--accent);
+}
+
+.sync-pairing-toggle-caret {
+  display: inline-block;
+  width: 12px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.sync-pairing-warning {
+  color: var(--warning, #ff9500);
+}
+
+.sync-pairing-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-4);
+  align-items: start;
+  margin-top: var(--space-2);
+}
+
+.sync-pairing-form {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.sync-pairing-label {
+  display: grid;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.sync-pairing-label select {
+  min-height: 36px;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.sync-pairing-field {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface-soft, rgba(0,0,0,0.04));
+  border-radius: 8px;
+}
+
+.sync-pairing-field-label {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  flex: 0 0 72px;
+}
+
+.sync-pairing-qr-wrap {
+  display: grid;
+  place-items: center;
+  padding: var(--space-3);
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.sync-pairing-qr {
+  width: 180px;
+  height: 180px;
+}
+
+.sync-pairing-qr img,
+.sync-pairing-qr canvas {
+  display: block;
+  width: 180px !important;
+  height: 180px !important;
+}
+
+@media (max-width: 540px) {
+  .sync-pairing-grid {
+    grid-template-columns: 1fr;
+  }
+  .sync-pairing-qr-wrap {
+    justify-self: center;
+  }
+}
+
 .dialog-footer {
   display: flex;
   flex-wrap: wrap;

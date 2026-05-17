@@ -319,17 +319,20 @@ async function handleSyncRoute(request, response, segments) {
   const [action] = segments;
 
   // /api/sync/token-info & /api/sync/server-info: used by the desktop UI
-  // running on the same machine to surface the token and LAN addresses.
-  // Restricted to localhost so a remote attacker can't read the token.
+  // running on the same machine to surface the token and LAN addresses for
+  // handheld pairing (Requirement 1.2). Restricted to localhost so a remote
+  // attacker can't read the token off the wire.
   if ((action === "token-info" || action === "server-info") && request.method === "GET") {
     const remote = request.socket.remoteAddress || "";
     const isLocal = remote === "127.0.0.1" || remote === "::1" || remote === "::ffff:127.0.0.1";
     if (!isLocal) {
-      sendError(response, 403, "Forbidden");
+      // Per design §Components 2.2: server-info MUST refuse non-loopback
+      // callers so the token never leaks to remote LAN peers.
+      sendJson(response, 403, { ok: false, error: "server-info 仅允许本机访问" });
       return;
     }
     if (action === "token-info") {
-      sendJson(response, 200, { token: sync.getOrCreateToken() });
+      sendJson(response, 200, { ok: true, token: sync.getOrCreateToken() });
       return;
     }
     const interfaces = os.networkInterfaces();
@@ -337,11 +340,29 @@ async function handleSyncRoute(request, response, segments) {
     for (const [name, list] of Object.entries(interfaces)) {
       for (const entry of list || []) {
         if (entry.family === "IPv4" && !entry.internal) {
-          addresses.push({ iface: name, address: entry.address });
+          // Keep the legacy `iface` alias so the existing 同步 dialog keeps
+          // working; new clients should read `interface` and `family`.
+          addresses.push({
+            address: entry.address,
+            interface: name,
+            iface: name,
+            family: entry.family,
+          });
         }
       }
     }
+    // Sort by usability for handheld pairing: 192.168.x.x (typical home/SMB
+    // LAN) > 10.x.x.x (corporate) > 172.16-31.x.x (Docker / less common) >
+    // anything else. Stable order within each tier preserves OS enumeration.
+    const tier = (addr) => {
+      if (/^192\.168\./.test(addr)) return 0;
+      if (/^10\./.test(addr)) return 1;
+      if (/^172\.(1[6-9]|2\d|3[01])\./.test(addr)) return 2;
+      return 3;
+    };
+    addresses.sort((a, b) => tier(a.address) - tier(b.address));
     sendJson(response, 200, {
+      ok: true,
       token: sync.getOrCreateToken(),
       hostname: os.hostname(),
       port,
@@ -368,8 +389,11 @@ async function handleSyncRoute(request, response, segments) {
 
     if (action === "upload" && request.method === "POST") {
       const body = await readJsonBody(request);
-      const counts = sync.applyUploadsPayload(body);
-      sendJson(response, 200, { ok: true, applied: counts });
+      const result = sync.applyUploadsPayload(body);
+      // Spread so { applied, operationsApplied, operationsSkippedDuplicate,
+      // operationsFailed } sit at the top level of the response, matching the
+      // handheld upload-lan.js consumer (design.md §Components 6.4).
+      sendJson(response, 200, { ok: true, ...result });
       return;
     }
 
