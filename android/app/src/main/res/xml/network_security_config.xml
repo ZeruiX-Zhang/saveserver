@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  network_security_config.xml — 手持端 LAN 明文 HTTP 放行配置
+
+  Android 9+ 默认拒绝 cleartext HTTP，会让手持端无法访问局域网内的
+  仓位管理 Server（http://192.168.x.x:4173/api/sync/*）。
+
+  本配置选择最简方案：base-config cleartextTrafficPermitted="true"，
+  对所有出站连接放行明文。这是本应用部署边界下的有意安全权衡：
+
+    1. 部署边界：仓位管理 Server 只在内网局域网监听，不会暴露到公网。
+    2. 鉴权：所有 /api/sync/* 端点均要求 X-Sync-Token 头，token 由
+       桌面端首次启动时生成（data/sync-token.txt），并通过 server-info
+       的"配对二维码"交付给手持端。HTTPS 与否不改变这一鉴权链。
+    3. 替代方案：本可用 domain-config 仅放行 192.168.x.x / 10.x.x.x /
+       172.16-31.x.x 三个常用 LAN 段，但 Android 的 domain-config
+       不直接支持 CIDR 表示，而企业 LAN 网段也不固定（VPN / 多网卡
+       / 桥接），实务上更易出错。
+
+  如果将来要把 Server 上 HTTPS（例如自签 + 在 res/raw/ 放证书），
+  可改成 base-config cleartextTrafficPermitted="false" + trust-anchors。
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

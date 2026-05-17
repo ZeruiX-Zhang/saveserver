@@ -1,0 +1,2 @@
+# shared/ 由 scripts/build-handheld.js 从 app/shared/ 镜像而来；不要手动编辑此目录
+shared/

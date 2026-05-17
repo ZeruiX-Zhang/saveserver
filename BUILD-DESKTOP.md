@@ -1,3 +1,8 @@
+> **Capacitor webDir 切换提示**
+>
+> `capacitor.config.json#webDir` 已指向 `android/app/src/main/assets/public`（手持端 Bundle）。
+> 桌面 Electron 打包走 `package.json#build.files` 的 `app/**/*`，与 Capacitor 配置完全解耦，请不要为了“修复”Capacitor 而把 `webDir` 改回 `"app"`。
+
 # 桌面化路线图
 
 本项目从"命令行 + 浏览器"演进到"桌面应用"分两步走。
